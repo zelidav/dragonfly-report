@@ -1,0 +1,98 @@
+<!doctype html><html lang="en"><head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dragonfly Cloud Bar Season One</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap">
+<style>
+:root{--red:#A81B2E;--red-deep:#7C1222;--paper:#F7EDEA;--ink-3:rgba(247,237,234,.6);}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--red-deep);color:var(--paper);
+  font-family:"Familjen Grotesk","Helvetica Neue",Arial,sans-serif;
+  display:flex;align-items:center;justify-content:center;padding:24px;}
+.card{width:100%;max-width:420px;text-align:left;}
+.mark{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px;
+  letter-spacing:.14em;text-transform:uppercase;margin-bottom:34px;}
+.mark svg{display:block;flex:none}
+h1{font-size:2rem;line-height:1.08;font-weight:600;letter-spacing:-.02em;margin:0 0 12px;text-wrap:balance;}
+.kicker{font-family:"DM Mono",monospace;font-size:11px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin:0 0 10px;}
+.sub{font-size:.95rem;line-height:1.55;color:rgba(247,237,234,.86);margin:0 0 28px;}
+label{display:block;font-family:"DM Mono",monospace;font-size:10.5px;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--ink-3);margin-bottom:7px;}
+input{width:100%;padding:12px 14px;border-radius:3px;border:1px solid rgba(247,237,234,.34);
+  background:rgba(0,0,0,.22);color:var(--paper);font-family:"DM Mono",monospace;font-size:15px;}
+input:focus{outline:2px solid var(--paper);outline-offset:1px;}
+button{margin-top:14px;width:100%;padding:12px 14px;border-radius:3px;border:none;cursor:pointer;
+  background:var(--paper);color:var(--red-deep);font-family:"Familjen Grotesk",sans-serif;
+  font-weight:600;font-size:15px;letter-spacing:.01em;}
+button:focus-visible{outline:2px solid #fff;outline-offset:2px;}
+button[disabled]{opacity:.55;cursor:progress;}
+#msg{font-family:"DM Mono",monospace;font-size:11.5px;line-height:1.5;letter-spacing:.03em;
+  min-height:1.4em;margin:14px 0 0;color:#FFD9C9;}
+.foot{font-family:"DM Mono",monospace;font-size:10px;letter-spacing:.12em;
+  text-transform:uppercase;color:var(--ink-3);margin:34px 0 0;}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style></head><body>
+<div class="card">
+  <div class="mark">
+    <svg width="20" height="24" viewBox="0 0 20 24" aria-hidden="true">
+      <path d="M10 0.5c2.6 4.4 1.2 6.6-.6 8.9-1.8 2.3-3.6 4.4-3.6 7.2a4.2 4.2 0 0 0 8.4 0c0-1.6-.6-2.8-1.4-4 2.4 1.1 4.2 3.5 4.2 6.3A7 7 0 0 1 10 23.5 7 7 0 0 1 3 18c0-4 2.6-6.2 4.6-8.7C9.4 7 10.6 4.5 10 .5Z" fill="#F7EDEA"/>
+    </svg>
+    SYPP Cloud Bar
+  </div>
+  <p class="kicker">Field report &middot; Dragonfly New York</p>
+  <h1>Season One</h1>
+  <p class="sub">Ten Cloud Bar activations, August&ndash;September 2026. This report is
+    passphrase protected &mdash; enter the passphrase you were sent.</p>
+  <form id="f" autocomplete="off">
+    <label for="pw">Passphrase</label>
+    <input id="pw" type="password" autocomplete="current-password" autofocus>
+    <button id="go" type="submit">Open report</button>
+    <p id="msg" role="status" aria-live="polite"></p>
+  </form>
+  <p class="foot">Prepared by SYPP Cloud Bar &middot; Field Operations</p>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+const b64 = (s) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
+
+async function unlock(pw) {
+  const blob = await (await fetch("payload.json", { cache: "no-store" })).json();
+  const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: b64(blob.salt), iterations: blob.iter, hash: "SHA-256" },
+    base, { name: "AES-GCM", length: 256 }, false, ["decrypt"]
+  );
+  const plain = await crypto.subtle.decrypt({ name: "AES-GCM", iv: b64(blob.nonce) }, key, b64(blob.ct));
+  return new TextDecoder().decode(plain);
+}
+
+// Decryption needs a secure context. Say so plainly rather than reporting it
+// as a bad passphrase, which would send the reader chasing the wrong problem.
+if (!window.isSecureContext || !crypto.subtle) {
+  $("#msg").textContent = "This page must be opened over https:// to decrypt.";
+  $("#go").disabled = true;
+  if (location.protocol === "http:") {
+    $("#msg").textContent += " Redirecting\u2026";
+    location.replace(location.href.replace(/^http:/, "https:"));
+  }
+}
+
+$("#f").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const btn = $("#go"), msg = $("#msg");
+  msg.textContent = ""; btn.disabled = true; btn.textContent = "Opening\u2026";
+  try {
+    const html = await unlock($("#pw").value);
+    document.open(); document.write(html); document.close();
+  } catch (err) {
+    msg.textContent = (err && err.name === "OperationError")
+      ? "That passphrase does not open this report."
+      : "Could not load the report (" + (err && err.name || "error") + "). Check the connection and retry.";
+    btn.disabled = false; btn.textContent = "Open report";
+    $("#pw").select();
+  }
+});
+</script></body></html>
